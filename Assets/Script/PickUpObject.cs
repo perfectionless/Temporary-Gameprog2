@@ -4,68 +4,102 @@ using UnityEngine;
 
 public class PickUpObject : MonoBehaviour
 {
-    public GameObject myHands; //reference to your hands/the position where you want your object to go
-    public bool canpickup; //a bool to see if you can or cant pick up the item
-    GameObject ObjectIwantToPickUp; // the gameobject onwhich you collided with
-    public bool hasItem; // a bool to see if you have an item in your hand
-    // public float pickupRange = 5f;
+    public GameObject myHands; // Position for holding the object
+    public bool canpickup; // Whether the player can pick up the item
+    private GameObject ObjectIwantToPickUp; // The gameobject currently being looked at
+    public bool hasItem; // Whether the player has an item
+    public float interactionRange = 5f;
+    public Camera playerCamera;
+    public Material highlightMaterial; // Material for highlighting
+    private Material originalMaterial; // Original material of the object
 
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        canpickup = false;    //setting both to false
-        hasItem = false;
-    }
-
-    // Update is called once per frame
     void Update()
     {
-        if(canpickup == true) // if you enter thecollider of the objecct
+        // Check if the player is looking at an object within range
+        CheckForInteraction();
+
+        if (canpickup && Input.GetKeyDown("f") && !hasItem) // Press 'f' to pick up
         {
-            if (Input.GetKeyDown("f") && hasItem == false)  // can be e or any key
-            {
-                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-                RaycastHit hit;
-
-
-
-                if (Physics.Raycast(ray, out hit, 100))
-                {               
-                    Debug.Log(hit.collider);
-                    if (hit.collider !=  null && hit.collider.CompareTag("object") && hit.collider.GetComponent<Rigidbody>() != null)
-                    {
-                        hasItem = true;
-
-                        ObjectIwantToPickUp = hit.collider.gameObject;
-                        ObjectIwantToPickUp.GetComponent<Rigidbody>().isKinematic = true;   //makes the rigidbody not be acted upon by forces
-                        ObjectIwantToPickUp.transform.position = myHands.transform.position; // sets the position of the object to your hand position
-                        ObjectIwantToPickUp.transform.parent = myHands.transform; //makes the object become a child of the parent so that it moves with the hands
-                    }
-                }
-            }
+            PickUp();
         }
-        if (Input.GetKeyDown("g") && hasItem == true) // if you have an item and get the key to remove the object, again can be any key
+
+        if (hasItem && Input.GetKeyDown("g")) // Press 'g' to drop the item
         {
-            hasItem = false;
-            ObjectIwantToPickUp.GetComponent<Rigidbody>().isKinematic = false; // make the rigidbody work again
-            ObjectIwantToPickUp.transform.parent = null; // make the object no be a child of the hands
+            Drop();
         }
     }
-    // private void OnTriggerEnter(Collider other) // to see when the player enters the collider
-    // {
-    //     if(hasItem == false)
-    //     {
-    //         if(other.gameObject.tag == "object") //on the object you want to pick up set the tag to be anything, in this case "object"
-    //         {
-    //             canpickup = true;  //set the pick up bool to true
-    //             ObjectIwantToPickUp = other.gameObject; //set the gameobject you collided with to one you can reference
-    //         }
-    //     }
-    // }
-    // private void OnTriggerExit(Collider other)
-    // {
-    //     canpickup = false; //when you leave the collider set the canpickup bool to false
-     
-    // }
+
+    // Checks if the player is looking at an object in pickup range
+    void CheckForInteraction()
+    {
+        // Create a ray from the center of the screen
+        Ray ray = playerCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        RaycastHit hit;
+
+        // Draw the ray in the Scene view for visualization
+        Debug.DrawRay(ray.origin, ray.direction * interactionRange, Color.green);
+
+        if (Physics.Raycast(ray, out hit, interactionRange))
+        {
+            if (hit.collider.gameObject.CompareTag("PickUp"))
+            {
+                if (ObjectIwantToPickUp != hit.collider.gameObject)
+                {
+                    // Reset the previous object's material if there was one
+                    if (ObjectIwantToPickUp != null)
+                    {
+                        ResetHighlight();
+                    }
+
+                    // Set the new object
+                    ObjectIwantToPickUp = hit.collider.gameObject;
+                    originalMaterial = ObjectIwantToPickUp.GetComponent<Renderer>().material;
+                    ObjectIwantToPickUp.GetComponent<Renderer>().material = highlightMaterial;
+                }
+
+                Debug.Log("Looking at object: " + hit.collider.gameObject.name);
+                canpickup = true;
+            }
+            else
+            {
+                ResetHighlight();
+                canpickup = false;
+                ObjectIwantToPickUp = null;
+            }
+        }
+        // else
+        // {
+        //     ResetHighlight();
+        //     canpickup = false;
+        //     ObjectIwantToPickUp = null;
+        // }
+    }
+
+    // Resets the material of the currently highlighted object
+    void ResetHighlight()
+    {
+        if (ObjectIwantToPickUp != null && originalMaterial != null)
+        {
+            ObjectIwantToPickUp.GetComponent<Renderer>().material = originalMaterial;
+        }
+    }
+
+    // Picks up the object
+    void PickUp()
+    {
+        hasItem = true;
+        ObjectIwantToPickUp.GetComponent<Rigidbody>().isKinematic = true; // Disable physics on the object
+        ObjectIwantToPickUp.transform.position = myHands.transform.position; // Move object to hands
+        ObjectIwantToPickUp.transform.parent = myHands.transform; // Parent the object to hands
+        ResetHighlight(); // Reset highlight after picking up
+    }
+
+    // Drops the object
+    void Drop()
+    {
+        hasItem = false;
+        ObjectIwantToPickUp.GetComponent<Rigidbody>().isKinematic = false; // Enable physics on the object
+        ObjectIwantToPickUp.transform.parent = null; // Unparent the object
+        ObjectIwantToPickUp = null;
+    }
 }
