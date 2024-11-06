@@ -10,6 +10,17 @@
       },
       "hash": "fca65130edd9ead157939e13791a6f9a3d8bd722"
     },
+    "com.cdm.figma.ui": {
+      "version": "https://github.com/cdmvision/unity-figma-importer.git#1.9.0-ugui",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.cdm.figma": "1.9.0",
+        "com.unity.nuget.newtonsoft-json": "2.0.2",
+        "com.unity.vectorgraphics": "2.0.0-preview.24"
+      },
+      "hash": "dd99ee4699bfde56dfb6155bf36b0d3a5135bf8c"
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 2,

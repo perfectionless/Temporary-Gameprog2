@@ -52,15 +52,15 @@ public class InteractionController : MonoBehaviour
         Debug.DrawRay(ray.origin, ray.direction * interactionRange, Color.green);
         if (Physics.Raycast(ray, out hit, interactionRange))
         {
-            Debug.Log(hit.collider.gameObject);
-
 
             if (hit.collider.gameObject.CompareTag("PickUp"))
             {
+                Debug.Log(hit.collider.gameObject.tag);
                 HandlePickupObject(hit.collider.gameObject);
             }
             else if (hit.collider.gameObject.CompareTag("Door"))
             {
+                Debug.Log(hit.collider.gameObject.tag);
                 HandleDoorObject(hit.collider.gameObject);
             }
             else
