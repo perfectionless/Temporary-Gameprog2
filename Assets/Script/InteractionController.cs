@@ -4,64 +4,74 @@ using UnityEngine;
 
 public class InteractionController : MonoBehaviour
 {
-    public GameObject myHands; // Position for holding the object
-    public bool canpickup; // Whether the player can pick up the item
-    private GameObject ObjectIwantToPickUp; // The gameobject currently being looked at
-    public bool hasItem; // Whether the player has an item
+    public GameObject myHands;
+    public bool canpickup;
+    private GameObject ObjectIwantToPickUp;
+    private GameObject interactableObject;
+    public bool hasItem;
     public float interactionRange = 5f;
     public Camera playerCamera;
-    public Material highlightMaterial; // Material for highlighting
-    private Material originalMaterial; // Original material of the object
+    public Material highlightMaterial;
+    private Material originalMaterial;
+    private Material interactableoriginalMaterial;
 
-    public bool isLookingAtDoor; // Whether the player is looking at a door
-    private bool isDoorOpen; // Whether the door is currently open
-    private GameObject doorObject; // The door object the player is looking at
-    public float doorOpenAngle = 90f; // The angle to open the door
-    public float doorCloseAngle = 0f; // The angle to close the door
-    public float doorSmooth = 2f; // Speed of door rotation
+    public bool isLookingAtDoor;
+    private bool isDoorOpen;
+    private GameObject doorObject;
+    private GameObject currentlyHeldObject;
+
+    public bool isLookingAtLever;
+    private GameObject leverObject;
+
+    public float doorOpenTime = 3f;
+
+    // Keep track of doors that are currently "open"
+    private Dictionary<GameObject, Coroutine> openDoors = new Dictionary<GameObject, Coroutine>();
 
     void Update()
     {
-        // Check if the player is looking at an object within range
         CheckForInteraction();
 
-        if (canpickup && Input.GetKeyDown("f") && !hasItem) // Press 'f' to pick up
+        if (canpickup && Input.GetKeyDown("f") && !hasItem)
         {
             PickUp();
         }
 
-        if (hasItem && Input.GetKeyDown("g")) // Press 'g' to drop the item
+        if (hasItem && Input.GetKeyDown("g"))
         {
             Drop();
         }
 
-        if (isLookingAtDoor && Input.GetKeyDown(KeyCode.E)) // Press 'E' to open/close the door
+        if (isLookingAtDoor && Input.GetKeyDown(KeyCode.E))
         {
             ToggleDoor();
         }
+
+        if (isLookingAtLever && Input.GetKeyDown(KeyCode.E))
+        {
+            ToggleLever();
+        }
     }
 
-    // Checks if the player is looking at an object in pickup range
     void CheckForInteraction()
     {
-        // Create a ray from the center of the screen
         Ray ray = playerCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
         RaycastHit hit;
 
-        // Draw the ray in the Scene view for visualization
         Debug.DrawRay(ray.origin, ray.direction * interactionRange, Color.green);
         if (Physics.Raycast(ray, out hit, interactionRange))
         {
-
             if (hit.collider.gameObject.CompareTag("PickUp"))
             {
-                Debug.Log(hit.collider.gameObject.tag);
                 HandlePickupObject(hit.collider.gameObject);
             }
             else if (hit.collider.gameObject.CompareTag("Door"))
             {
-                Debug.Log(hit.collider.gameObject.tag);
                 HandleDoorObject(hit.collider.gameObject);
+            }
+            else if (hit.collider.gameObject.CompareTag("Lever"))
+            {
+                HandleLeverObject(hit.collider.gameObject);
             }
             else
             {
@@ -74,7 +84,6 @@ public class InteractionController : MonoBehaviour
         }
     }
 
-    // Handles interaction with pickup objects
     void HandlePickupObject(GameObject pickupObject)
     {
         if (ObjectIwantToPickUp != pickupObject)
@@ -86,77 +95,161 @@ public class InteractionController : MonoBehaviour
         }
 
         canpickup = true;
-        isLookingAtDoor = false; // Ensure we're not interacting with a door
+        isLookingAtDoor = false;
+        isLookingAtLever = false;
     }
 
-    // Handles interaction with door objects
     void HandleDoorObject(GameObject door)
     {
         ResetHighlight();
-
+        interactableObject = door;
+        interactableoriginalMaterial = interactableObject.GetComponent<Renderer>().material;
+        interactableObject.GetComponent<Renderer>().material = highlightMaterial;
         isLookingAtDoor = true;
         doorObject = door;
-        canpickup = false; // Ensure we're not interacting with a pickup item
+
+        // Check if the door is jammed
+        JammedDoor jammedDoor = door.GetComponent<JammedDoor>();
+        if (jammedDoor != null)
+        {
+            // Highlight differently if the player isn't holding the required object
+            if (currentlyHeldObject == null || currentlyHeldObject.name != jammedDoor.requiredObjectName)
+            {
+                Debug.Log("The door is jammed! You need to hold the correct object to open it.");
+                canpickup = false;
+                return;
+            }
+        }
+
+        canpickup = false;
+        isLookingAtLever = false;
     }
 
-    // Resets the interaction state
+    void HandleLeverObject(GameObject lever)
+    {
+        ResetHighlight();
+        interactableObject = lever;
+        interactableoriginalMaterial = interactableObject.GetComponent<Renderer>().material;
+        interactableObject.GetComponent<Renderer>().material = highlightMaterial;
+        isLookingAtLever = true;
+        leverObject = lever;
+        canpickup = false;
+        isLookingAtDoor = false;
+    }
+
     void ResetInteraction()
     {
         ResetHighlight();
         canpickup = false;
         ObjectIwantToPickUp = null;
         isLookingAtDoor = false;
+        isLookingAtLever = false;
         doorObject = null;
+        leverObject = null;
     }
 
-    // Resets the material of the currently highlighted object
     void ResetHighlight()
     {
         if (ObjectIwantToPickUp != null && originalMaterial != null)
         {
             ObjectIwantToPickUp.GetComponent<Renderer>().material = originalMaterial;
         }
+
+        if (interactableObject != null && interactableoriginalMaterial != null)
+        {
+            interactableObject.GetComponent<Renderer>().material = interactableoriginalMaterial;
+        }
     }
 
-    // Picks up the object
     void PickUp()
     {
         hasItem = true;
-        ObjectIwantToPickUp.GetComponent<Rigidbody>().isKinematic = true; // Disable physics on the object
-        ObjectIwantToPickUp.transform.position = myHands.transform.position; // Move object to hands
-        ObjectIwantToPickUp.transform.parent = myHands.transform; // Parent the object to hands
-        ResetHighlight(); // Reset highlight after picking up
+        currentlyHeldObject = ObjectIwantToPickUp;
+        currentlyHeldObject.GetComponent<Rigidbody>().isKinematic = true;
+        currentlyHeldObject.transform.position = myHands.transform.position;
+        currentlyHeldObject.transform.parent = myHands.transform;
+        ResetHighlight();
     }
 
-    // Drops the object
     void Drop()
     {
+        if (currentlyHeldObject == null) return;
+
         hasItem = false;
-        ObjectIwantToPickUp.GetComponent<Rigidbody>().isKinematic = false; // Enable physics on the object
-        ObjectIwantToPickUp.transform.parent = null; // Unparent the object
-        ObjectIwantToPickUp = null;
+        currentlyHeldObject.GetComponent<Rigidbody>().isKinematic = false;
+        currentlyHeldObject.transform.parent = null;
+        currentlyHeldObject = null;
     }
 
-    // Toggles the door open/close state
     void ToggleDoor()
     {
-        isDoorOpen = !isDoorOpen; // Toggle door state
-        float targetAngle = isDoorOpen ? doorOpenAngle : doorCloseAngle;
-        StartCoroutine(RotateDoor(targetAngle));
+        if (doorObject != null)
+        {
+            // Check if the door is jammed
+            JammedDoor jammedDoor = doorObject.GetComponent<JammedDoor>();
+            if (jammedDoor != null)
+            {
+                // Confirm the player is holding the required object
+                if (currentlyHeldObject == null || currentlyHeldObject.name != jammedDoor.requiredObjectName)
+                {
+                    Debug.Log("The door is jammed and you do not have the required object.");
+                    return;
+                }
+            }
+
+            // Open the door if it isn't jammed or the requirement is met
+            if (!openDoors.ContainsKey(doorObject))
+            {
+
+                if (jammedDoor != null)
+                {
+                    MeshRenderer meshRenderer = doorObject.GetComponent<MeshRenderer>();
+                    Collider doorCollider = doorObject.GetComponent<Collider>();
+
+                    if (meshRenderer != null) meshRenderer.enabled = false;
+                    if (doorCollider != null) doorCollider.enabled = false;
+
+                    Destroy(currentlyHeldObject);
+                    Drop();
+                }
+                else
+                {
+                    Coroutine doorCoroutine = StartCoroutine(OpenDoorTemporarily(doorObject));
+                    openDoors.Add(doorObject, doorCoroutine);
+                }
+            }
+        }
     }
 
-    // Coroutine to smoothly rotate the door
-    IEnumerator RotateDoor(float targetAngle)
+    IEnumerator OpenDoorTemporarily(GameObject door)
     {
-        Quaternion initialRotation = doorObject.transform.localRotation;
-        Quaternion targetRotation = Quaternion.Euler(0, targetAngle, 0) * initialRotation;
+        if (door == null) yield break;
 
-        while (Quaternion.Angle(doorObject.transform.localRotation, targetRotation) > 0.1f)
+        MeshRenderer meshRenderer = door.GetComponent<MeshRenderer>();
+        Collider doorCollider = door.GetComponent<Collider>();
+
+        if (meshRenderer != null) meshRenderer.enabled = false;
+        if (doorCollider != null) doorCollider.enabled = false;
+
+        yield return new WaitForSeconds(doorOpenTime);
+
+        if (door != null)
         {
-            doorObject.transform.localRotation = Quaternion.Slerp(doorObject.transform.localRotation, targetRotation, Time.deltaTime * doorSmooth);
-            yield return null;
+            if (meshRenderer != null) meshRenderer.enabled = true;
+            if (doorCollider != null) doorCollider.enabled = true;
+            openDoors.Remove(door);
         }
-        
-        doorObject.transform.localRotation = targetRotation;
+    }
+
+    void ToggleLever()
+    {
+        if (leverObject != null)
+        {
+            Lever lever = leverObject.GetComponent<Lever>();
+            if (lever != null)
+            {
+                lever.Toggle();
+            }
+        }
     }
 }

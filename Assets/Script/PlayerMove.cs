@@ -5,42 +5,38 @@ using UnityEngine;
 public class PlayerMove : MonoBehaviour
 {
     public CharacterController controller;
+    public float speed = 8f;
+    public float ascendSpeed = 5f;
+    public float descendSpeed = 5f;
 
-    public float speed = -8f;
-    public float gravity = -9.81f;
-    public float jumpHeight = 3f;
-
-    public Transform groundCheck;
-    public float groundDistance = 0.4f;
-    public LayerMask groundMask;
-
-    Vector3 velocity;
-    bool isGrounded;
+    private Vector3 movement;
 
     // Update is called once per frame
+
     void Update()
     {
-        isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
+        float horizontal = Input.GetAxis("Horizontal");
+        float vertical = Input.GetAxis("Vertical");
 
-        if(isGrounded && velocity.y < 0)
+        // Calculate horizontal movement
+        movement = transform.right * horizontal + transform.forward * vertical;
+        movement *= speed;
+
+        // Handle ascending and descending
+        if (Input.GetButton("Jump"))
         {
-            velocity.y = -2f;
+            movement.y = ascendSpeed;
+        }
+        else if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+        {
+            movement.y = -descendSpeed;
+        }
+        else
+        {
+            movement.y = 0f;
         }
 
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
-
-        Vector3 move = transform.right * x + transform.forward * z;
-
-        controller.Move(move * speed * Time.deltaTime);
-
-        if(Input.GetButtonDown("Jump") && isGrounded)
-        {
-            velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
-        }
-
-        velocity.y += gravity * Time.deltaTime;
-
-        controller.Move(velocity * Time.deltaTime);
+        // Move the player
+        controller.Move(movement * Time.deltaTime);
     }
 }
