@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/INCIDENT_prototype.unity
+    guid: d29071f3fc8eea545ae26ddc055b8fd9
   m_configObjects: {}
